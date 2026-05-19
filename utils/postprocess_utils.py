@@ -2,54 +2,51 @@ import cv2
 import numpy as np
 
 
-def threshold_heatmap(
+def create_binary_mask(
     heatmap,
     threshold=180
 ):
 
-    binary_mask = np.zeros_like(
+    _, binary_mask = cv2.threshold(
         heatmap,
-        dtype=np.uint8
+        threshold,
+        255,
+        cv2.THRESH_BINARY
     )
-
-    binary_mask[
-        heatmap >= threshold
-    ] = 255
 
     return binary_mask
 
 
 def clean_mask(
-    binary_mask
+    binary_mask,
+    kernel_size=5
 ):
 
     kernel = np.ones(
-        (5, 5),
+        (kernel_size, kernel_size),
         np.uint8
     )
 
-    cleaned_mask = cv2.morphologyEx(
+    cleaned = cv2.morphologyEx(
         binary_mask,
         cv2.MORPH_OPEN,
         kernel
     )
 
-    cleaned_mask = cv2.morphologyEx(
-        cleaned_mask,
+    cleaned = cv2.morphologyEx(
+        cleaned,
         cv2.MORPH_CLOSE,
         kernel
     )
 
-    return cleaned_mask
+    return cleaned
 
 
 def detect_defects(
     image,
     cleaned_mask,
-    min_area=100
+    min_area=400
 ):
-
-    output_image = image.copy()
 
     contours, _ = cv2.findContours(
         cleaned_mask,
@@ -57,25 +54,23 @@ def detect_defects(
         cv2.CHAIN_APPROX_SIMPLE
     )
 
+    output = image.copy()
+
     for contour in contours:
 
-        area = cv2.contourArea(
-            contour
-        )
+        area = cv2.contourArea(contour)
 
         if area < min_area:
             continue
 
-        x, y, w, h = cv2.boundingRect(
-            contour
-        )
+        x, y, w, h = cv2.boundingRect(contour)
 
         cv2.rectangle(
-            output_image,
+            output,
             (x, y),
             (x + w, y + h),
             (255, 0, 0),
             2
         )
 
-    return output_image
+    return output

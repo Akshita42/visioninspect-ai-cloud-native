@@ -1,7 +1,7 @@
 from transformers import CLIPProcessor, CLIPModel
 from PIL import Image
 from utils.postprocess_utils import (
-    threshold_heatmap,
+    create_binary_mask,
     clean_mask,
     detect_defects
 )
@@ -167,7 +167,7 @@ heatmap = generate_heatmap(
 
 print("Heatmap generated.")
 
-binary_mask = threshold_heatmap(
+binary_mask = create_binary_mask(
     heatmap,
     threshold=180
 )
@@ -180,7 +180,7 @@ cleaned_mask = clean_mask(
 
 print("Mask cleaned.")
 
-defect_output = detect_defects(
+detection_output = detect_defects(
     test_image_np,
     cleaned_mask
 )
@@ -209,7 +209,7 @@ heatmap_path = "outputs/heatmap.png"
 
 overlay_path = "outputs/overlay.png"
 
-defect_output_path = "outputs/defect_detection.png"
+detection_path = "outputs/defect_detection.png"
 
 
 cv2.imwrite(
@@ -226,9 +226,9 @@ cv2.imwrite(
 )
 
 cv2.imwrite(
-    defect_output_path,
+    detection_path,
     cv2.cvtColor(
-        defect_output,
+        detection_output,
         cv2.COLOR_RGB2BGR
     )
 )
@@ -238,9 +238,7 @@ print(f"Heatmap saved at: {heatmap_path}")
 
 print(f"Overlay saved at: {overlay_path}")
 
-print(
-    f"Defect detection saved at: {defect_output_path}"
-)
+print(f"Defect detection saved at: {detection_path}")
 
 
 print("Pipeline execution completed successfully.")
