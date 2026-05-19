@@ -27,7 +27,7 @@ def generate_heatmap(
         heatmap[
             y:y + patch_size,
             x:x + patch_size
-        ] += score
+        ] += float(score)
 
         count_map[
             y:y + patch_size,
@@ -38,14 +38,32 @@ def generate_heatmap(
         count_map == 0
     ] = 1
 
+    # Average overlapping patches
     heatmap = heatmap / count_map
 
+    # Normalize before blur
+    heatmap = cv2.normalize(
+        heatmap,
+        None,
+        0,
+        1,
+        cv2.NORM_MINMAX
+    )
+
+    # Mild smoothing (NOT overly blurry)
     heatmap = cv2.GaussianBlur(
         heatmap,
-        (31, 31),
+        (9, 9),
         0
     )
 
+    # Increase contrast
+    heatmap = np.power(
+        heatmap,
+        1.5
+    )
+
+    # Convert to 0-255
     heatmap = cv2.normalize(
         heatmap,
         None,
@@ -66,25 +84,24 @@ def create_overlay(
     heatmap
 ):
 
-    heatmap_uint8 = np.uint8(
-        255 * heatmap
-    )
-
+    # Apply color map
     heatmap_colored = cv2.applyColorMap(
-        heatmap_uint8,
+        heatmap,
         cv2.COLORMAP_JET
     )
 
+    # Convert BGR -> RGB
     heatmap_colored = cv2.cvtColor(
         heatmap_colored,
         cv2.COLOR_BGR2RGB
     )
 
+    # Blend overlay
     overlay = cv2.addWeighted(
         image,
-        0.6,
+        0.72,
         heatmap_colored,
-        0.4,
+        0.28,
         0
     )
 

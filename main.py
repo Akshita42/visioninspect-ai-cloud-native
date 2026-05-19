@@ -1,5 +1,10 @@
 from transformers import CLIPProcessor, CLIPModel
 from PIL import Image
+from utils.postprocess_utils import (
+    threshold_heatmap,
+    clean_mask,
+    detect_defects
+)
 
 import torch
 import numpy as np
@@ -61,7 +66,7 @@ print("Test image loaded.")
 patches, positions = extract_overlapping_patches(
     test_image_np,
     patch_size=64,
-    stride=32
+    stride=64
 )
 
 print(f"Total test patches: {len(patches)}")
@@ -110,7 +115,7 @@ for path in reference_paths:
     ref_patches, _ = extract_overlapping_patches(
         ref_np,
         patch_size=64,
-        stride=32
+        stride=64
     )
 
     ref_embeddings = get_patch_embeddings(
@@ -162,6 +167,26 @@ heatmap = generate_heatmap(
 
 print("Heatmap generated.")
 
+binary_mask = threshold_heatmap(
+    heatmap,
+    threshold=180
+)
+
+print("Binary mask created.")
+
+cleaned_mask = clean_mask(
+    binary_mask
+)
+
+print("Mask cleaned.")
+
+defect_output = detect_defects(
+    test_image_np,
+    cleaned_mask
+)
+
+print("Defects detected.")
+
 
 # CREATE OVERLAY
 
@@ -184,6 +209,8 @@ heatmap_path = "outputs/heatmap.png"
 
 overlay_path = "outputs/overlay.png"
 
+defect_output_path = "outputs/defect_detection.png"
+
 
 cv2.imwrite(
     heatmap_path,
@@ -198,9 +225,22 @@ cv2.imwrite(
     )
 )
 
+cv2.imwrite(
+    defect_output_path,
+    cv2.cvtColor(
+        defect_output,
+        cv2.COLOR_RGB2BGR
+    )
+)
+
+
 print(f"Heatmap saved at: {heatmap_path}")
 
 print(f"Overlay saved at: {overlay_path}")
+
+print(
+    f"Defect detection saved at: {defect_output_path}"
+)
 
 
 print("Pipeline execution completed successfully.")
