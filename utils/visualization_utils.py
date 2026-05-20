@@ -41,6 +41,9 @@ def generate_heatmap(
     # Average overlapping patches
     heatmap = heatmap / count_map
 
+    if np.max(heatmap) == 0:
+        return np.zeros_like(heatmap, dtype=np.uint8)
+
     # Normalize before blur
     heatmap = cv2.normalize(
         heatmap,
@@ -83,6 +86,8 @@ def create_overlay(
     image,
     heatmap
 ):
+    if np.max(heatmap) == 0:
+        return image.copy()
 
     # Apply color map
     heatmap_colored = cv2.applyColorMap(

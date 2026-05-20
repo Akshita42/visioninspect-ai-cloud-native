@@ -423,8 +423,8 @@ export default function Playground() {
                         
                         <div className="flex items-center justify-between pb-4 border-b border-white/5">
                           <span className="text-xs font-mono font-bold tracking-widest text-slate-500 uppercase">Inspection Report Summary</span>
-                          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded text-xs font-mono font-bold uppercase ${results.detected_regions.length > 0 ? 'bg-red-500/10 text-red-400 border border-red-500/20' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'}`}>
-                            {results.detected_regions.length > 0 ? <AlertTriangle className="w-3.5 h-3.5" /> : <CheckCircle className="w-3.5 h-3.5" />}
+                          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded text-xs font-mono font-bold uppercase ${results.status === 'POSSIBLE ANOMALY DETECTED' ? 'bg-red-500/10 text-red-400 border border-red-500/20' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'}`}>
+                            {results.status === 'POSSIBLE ANOMALY DETECTED' ? <AlertTriangle className="w-3.5 h-3.5" /> : <CheckCircle className="w-3.5 h-3.5" />}
                             {results.status}
                           </span>
                         </div>

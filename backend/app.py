@@ -107,35 +107,61 @@ async def analyze_images(
 
         # Generate anomaly visual outputs
         heatmap = generate_heatmap(anomaly_scores, positions, test_np.shape, patch_size=64)
-        binary_mask = create_binary_mask(heatmap, threshold=180)
-        cleaned_mask = clean_mask(binary_mask)
+
+        # 1. Similarity tolerance logic before final anomaly decision
+        # Check if identical or near-identical images
+        is_nominal = (mean_sim >= 0.985 and min_sim >= 0.95) or (np.max(heatmap) == 0)
+
+        if is_nominal:
+            binary_mask = np.zeros_like(heatmap)
+            cleaned_mask = np.zeros_like(heatmap)
+            heatmap = np.zeros_like(heatmap)
+            detected_regions = []
+        else:
+            # Generate binary mask
+            binary_mask = create_binary_mask(heatmap, threshold=180)
+            cleaned_mask = clean_mask(binary_mask)
+
+            # 2. Suppress weak heatmap activations
+            if np.max(heatmap) < 15:
+                cleaned_mask[:] = 0
+                binary_mask[:] = 0
+
+            # 3. Improve contour filtering (area >= 600px only)
+            contours, _ = cv2.findContours(cleaned_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            detected_regions = []
+            for i, contour in enumerate(contours):
+                area = cv2.contourArea(contour)
+                if area < 600:
+                    continue
+                x, y, w, h = cv2.boundingRect(contour)
+                detected_regions.append({
+                    "id": len(detected_regions),
+                    "x": float(x) / 512.0 * 100,
+                    "y": float(y) / 512.0 * 100,
+                    "width": float(w) / 512.0 * 100,
+                    "height": float(h) / 512.0 * 100,
+                    "area_px": int(area)
+                })
+
+        # Defect visualization overlays (using possibly zeroed out heatmap/mask)
         defect_detection = detect_defects(test_np, cleaned_mask)
         overlay = create_overlay(test_np, heatmap)
 
-        # Find contours to calculate detected regions in percentage coordinates
-        contours, _ = cv2.findContours(cleaned_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        detected_regions = []
-        for i, contour in enumerate(contours):
-            area = cv2.contourArea(contour)
-            if area < 400: # min_area limit
-                continue
-            x, y, w, h = cv2.boundingRect(contour)
-            detected_regions.append({
-                "id": i,
-                "x": float(x) / 512.0 * 100,
-                "y": float(y) / 512.0 * 100,
-                "width": float(w) / 512.0 * 100,
-                "height": float(h) / 512.0 * 100,
-                "area_px": int(area)
-            })
-
-        # Calculate a realistic anomaly score (percentage of anomalous surface area)
-        anomaly_pixel_ratio = float(np.sum(cleaned_mask > 0) / cleaned_mask.size)
-        # Scale score dynamically based on defect count and size
-        anomaly_score = min(1.0, float(1.0 - mean_sim + len(detected_regions) * 0.1))
-
-        # Create localized explanation based on real patch similarities
+        # 4. Fix anomaly score logic
+        # Remove aggressive contour-based score inflation
         if len(detected_regions) > 0:
+            anomaly_score = float((1.0 - mean_sim) * 0.3 + (1.0 - min_sim) * 0.7)
+            anomaly_score = max(0.0, min(1.0, anomaly_score))
+        else:
+            anomaly_score = float(max(0.0, (1.0 - mean_sim) * 0.1))
+
+        anomaly_pixel_ratio = float(np.sum(cleaned_mask > 0) / cleaned_mask.size)
+
+        # 5. Add proper anomaly decision logic
+        has_anomalies = (mean_sim < 0.985 or min_sim < 0.95) and (len(detected_regions) > 0)
+
+        if has_anomalies:
             status = "POSSIBLE ANOMALY DETECTED"
             explanation = (
                 f"The patch comparison detected visual inconsistencies compared to the reference image in "
@@ -151,6 +177,13 @@ async def analyze_images(
                 f"within acceptable statistical thresholds. The average patch similarity index is {mean_sim:.3f} "
                 f"(minimum local similarity: {min_sim:.3f}), indicating a highly similar surface configuration."
             )
+            # Ensure everything is clean and empty
+            detected_regions = []
+            anomaly_score = float(max(0.0, (1.0 - mean_sim) * 0.1))
+            heatmap = np.zeros_like(heatmap)
+            overlay = test_np.copy()
+            defect_detection = test_np.copy()
+            anomaly_pixel_ratio = 0.0
 
         # Convert images to base64 Data URLs
         ref_b64 = encode_img_to_base64(cv2.cvtColor(ref_np, cv2.COLOR_RGB2BGR))
