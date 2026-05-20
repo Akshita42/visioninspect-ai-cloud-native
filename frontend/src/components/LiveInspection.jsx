@@ -1,11 +1,62 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { jsPDF } from 'jspdf';
 import { 
-  Camera, Video, AlertTriangle, CheckCircle, Info, 
-  RefreshCw, Trash2, VideoOff, ShieldCheck, Play, Layers
+  Camera, Video, AlertTriangle, CheckCircle, Info, AlertCircle,
+  RefreshCw, Trash2, VideoOff, ShieldCheck, Play, Layers, Download, Clock
 } from 'lucide-react';
 
-export default function LiveInspection() {
+// Severity helpers (mirrors Playground.jsx)
+function getSeverityConfig(status) {
+  switch (status) {
+    case 'STRUCTURE VERIFIED':
+      return { bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', text: 'text-emerald-400', icon: <CheckCircle className="w-3.5 h-3.5" />, bar: 'bg-emerald-500', barWidth: '8%' };
+    case 'MINOR VISUAL VARIATION':
+      return { bg: 'bg-amber-500/10', border: 'border-amber-500/20', text: 'text-amber-400', icon: <Info className="w-3.5 h-3.5" />, bar: 'bg-amber-400', barWidth: '35%' };
+    case 'MODERATE ANOMALY':
+      return { bg: 'bg-orange-500/10', border: 'border-orange-500/20', text: 'text-orange-400', icon: <AlertCircle className="w-3.5 h-3.5" />, bar: 'bg-orange-500', barWidth: '65%' };
+    case 'SEVERE ANOMALY':
+      return { bg: 'bg-red-500/10', border: 'border-red-500/20', text: 'text-red-400', icon: <AlertTriangle className="w-3.5 h-3.5" />, bar: 'bg-red-500', barWidth: '95%' };
+    default:
+      return { bg: 'bg-slate-500/10', border: 'border-slate-500/20', text: 'text-slate-400', icon: <Info className="w-3.5 h-3.5" />, bar: 'bg-slate-500', barWidth: '50%' };
+  }
+}
+
+async function exportPDF(results, inspectionType = 'Dynamic Inspection') {
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const W = 210; const margin = 14; let y = 0;
+  doc.setFillColor(10, 14, 26); doc.rect(0, 0, W, 297, 'F');
+  doc.setFillColor(0, 180, 216); doc.rect(0, 0, W, 28, 'F');
+  doc.setFontSize(16); doc.setTextColor(255,255,255); doc.setFont('helvetica','bold');
+  doc.text('VisionInspect AI', margin, 11);
+  doc.setFontSize(8); doc.setFont('helvetica','normal');
+  doc.text('Reference-Based Anomaly Localization System — Academic Research Demo', margin, 17);
+  doc.text(`Inspection Report · Generated: ${new Date().toLocaleString()}`, margin, 23); y = 35;
+  doc.setFontSize(8); doc.setTextColor(150,180,220); doc.text('INSPECTION TYPE', margin, y);
+  doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.text(inspectionType, margin, y+5); y += 15;
+  const colors = {'STRUCTURE VERIFIED':[52,211,153],'MINOR VISUAL VARIATION':[251,191,36],'MODERATE ANOMALY':[249,115,22],'SEVERE ANOMALY':[239,68,68]};
+  const [r,g,b] = colors[results.status] || [148,163,184];
+  doc.setFillColor(r,g,b,0.15); doc.roundedRect(margin,y-4,W-margin*2,12,2,2,'F');
+  doc.setTextColor(r,g,b); doc.setFontSize(10); doc.setFont('helvetica','bold');
+  doc.text(`● ${results.status}`, margin+3, y+4); y += 16;
+  doc.setFontSize(8); doc.setTextColor(100,140,180); doc.text('SIMILARITY METRICS', margin, y); y += 6;
+  const mRows = [['Mean Patch Similarity',results.metrics.mean_similarity.toFixed(4)],['Min Patch Similarity',results.metrics.min_similarity.toFixed(4)],['Anomaly Score',results.anomaly_score.toFixed(4)],['Anomaly Area Ratio',`${(results.metrics.anomaly_pixel_ratio*100).toFixed(2)}%`],['Detected Regions',String(results.detected_regions.length)]];
+  mRows.forEach(([label,value],i)=>{ const rY=y+i*7; doc.setFillColor(i%2===0?20:16,i%2===0?25:20,i%2===0?40:35); doc.rect(margin,rY-3,W-margin*2,7,'F'); doc.setTextColor(160,180,210); doc.setFont('helvetica','normal'); doc.text(label,margin+2,rY+1); doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.text(value,W-margin-2,rY+1,{align:'right'}); }); y += mRows.length*7+6;
+  doc.setFontSize(8); doc.setTextColor(100,140,180); doc.text('INTERPRETATION LAYER', margin, y); y += 5;
+  doc.setFillColor(18,22,40); doc.roundedRect(margin,y,W-margin*2,24,2,2,'F');
+  doc.setTextColor(200,215,235); doc.setFont('helvetica','normal'); doc.setFontSize(7.5);
+  const wrapped = doc.splitTextToSize(results.explanation, W-margin*2-4); doc.text(wrapped.slice(0,4),margin+2,y+6); y += 30;
+  const imgW=(W-margin*2-9)/4; const imgH=imgW;
+  doc.setFontSize(8); doc.setTextColor(100,140,180); doc.text('VISUAL OUTPUTS', margin, y); y += 5;
+  const imgSrcs=[results.test_image,results.heatmap,results.overlay,results.defect_detection];
+  const imgLabels=['Test Image','Heatmap','Overlay Map','Defect Detection'];
+  imgSrcs.forEach((src,i)=>{ const x=margin+i*(imgW+3); doc.setFillColor(15,20,38); doc.roundedRect(x,y,imgW,imgH,2,2,'F'); try { doc.addImage(src,src.includes('png')?'PNG':'JPEG',x,y,imgW,imgH); } catch(_){} doc.setTextColor(120,150,190); doc.setFontSize(6.5); doc.text(imgLabels[i],x+imgW/2,y+imgH+4,{align:'center'}); }); y+=imgH+10;
+  doc.setFillColor(0,120,160); doc.rect(0,287,W,10,'F'); doc.setTextColor(200,240,255); doc.setFontSize(6.5); doc.setFont('helvetica','normal');
+  doc.text('VisionInspect AI · Academic Research Demo · CLIP-Based Visual Anomaly Localization', W/2, 293, {align:'center'});
+  doc.save(`VisionInspect_Report_${Date.now()}.pdf`);
+}
+
+export default function LiveInspection({ onHistoryUpdate }) {
   const videoRef = useRef(null);
   const [stream, setStream] = useState(null);
   const [cameraActive, setCameraActive] = useState(false);
@@ -209,6 +260,18 @@ export default function LiveInspection() {
 
       const data = await response.json();
       setResults(data);
+      // Push to shared history
+      if (onHistoryUpdate) {
+        onHistoryUpdate({
+          id: Date.now(),
+          timestamp: new Date().toLocaleString(),
+          type: 'Dynamic Inspection',
+          status: data.status,
+          anomaly_score: data.anomaly_score,
+          mean_similarity: data.metrics.mean_similarity,
+          thumbnail: data.test_image,
+        });
+      }
     } catch (err) {
       console.error(err);
       setError(err.message || "Failed to complete frame analysis. Verify backend server connectivity.");
@@ -516,59 +579,62 @@ export default function LiveInspection() {
             {/* --- REPORT & EXPLANATION ROW --- */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
               
-              {/* Left & Middle: System Report Panel */}
-              <div className="lg:col-span-2 border border-white/5 bg-white/2 rounded-xl p-6 flex flex-col justify-between">
-                <div className="space-y-6">
-                  
-                  <div className="flex items-center justify-between pb-4 border-b border-white/5">
-                    <span className="text-xs font-mono font-bold tracking-widest text-slate-500 uppercase">Inspection Report Summary</span>
-                    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded text-xs font-mono font-bold uppercase ${results.status === 'POSSIBLE ANOMALY DETECTED' ? 'bg-red-500/10 text-red-400 border border-red-500/20' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'}`}>
-                      {results.status === 'POSSIBLE ANOMALY DETECTED' ? <AlertTriangle className="w-3.5 h-3.5" /> : <CheckCircle className="w-3.5 h-3.5" />}
-                      {results.status}
+              <div className="lg:col-span-2 border border-white/5 bg-white/2 rounded-xl p-6 flex flex-col gap-5">
+                {/* Status Header */}
+                <div className="flex items-center justify-between pb-4 border-b border-white/5">
+                  <span className="text-xs font-mono font-bold tracking-widest text-slate-500 uppercase">Inspection Report Summary</span>
+                  {(() => { const sc = getSeverityConfig(results.status); return (
+                    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded text-xs font-mono font-bold uppercase ${sc.bg} ${sc.text} border ${sc.border}`}>
+                      {sc.icon}{results.status}
                     </span>
-                  </div>
-
-                  {/* Explain Result Accordion Button */}
-                  <div className="flex justify-between items-center bg-dark-deep/40 p-3 rounded-lg border border-white/5 text-xs">
-                    <span className="text-slate-400 font-mono">Translate metrics into readable text:</span>
-                    <button
-                      onClick={() => setShowLaymanExplanation(!showLaymanExplanation)}
-                      className="px-3.5 py-1.5 bg-white/5 hover:bg-white/10 text-white rounded font-mono border border-white/5 cursor-pointer active:scale-95 transition-all"
-                    >
-                      {showLaymanExplanation ? "Hide Summary" : "Interpret Metrics"}
-                    </button>
-                  </div>
-
-                  {/* EXPLANATION AREA */}
-                  <div className="p-4 rounded-lg bg-dark-deep/60 border border-white/5">
-                    <span className="text-[10px] font-mono text-slate-500 uppercase font-bold tracking-wider block mb-2">
-                      {showLaymanExplanation ? "Rule-Based Summary" : "Interpretation Layer Analysis"}
-                    </span>
-                    <p className="text-slate-300 text-sm leading-relaxed">
-                      {showLaymanExplanation 
-                        ? "The patch comparison module evaluated local variations against your baseline reference. Regions containing significant similarity deviations (e.g., structural variations, scratches, or deformations) have been identified and highlighted." 
-                        : results.explanation
-                      }
-                    </p>
-                  </div>
-
-                  {/* Technical similarity indices */}
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div className="border border-white/5 bg-dark-deep/40 p-4 rounded-lg">
-                      <span className="text-[9px] font-mono text-slate-500 uppercase font-semibold block mb-1">Average Patch Similarity</span>
-                      <span className="text-xl font-bold text-white font-mono">{results.metrics.mean_similarity.toFixed(4)}</span>
-                    </div>
-                    <div className="border border-white/5 bg-dark-deep/40 p-4 rounded-lg">
-                      <span className="text-[9px] font-mono text-slate-500 uppercase font-semibold block mb-1">Min Patch Similarity</span>
-                      <span className="text-xl font-bold text-white font-mono">{results.metrics.min_similarity.toFixed(4)}</span>
-                    </div>
-                    <div className="border border-white/5 bg-dark-deep/40 p-4 rounded-lg">
-                      <span className="text-[9px] font-mono text-slate-500 uppercase font-semibold block mb-1">Anomaly Area Ratio</span>
-                      <span className="text-xl font-bold text-white font-mono">{(results.metrics.anomaly_pixel_ratio * 100).toFixed(2)}%</span>
-                    </div>
-                  </div>
-
+                  ); })()}
                 </div>
+
+                {/* Severity Bar */}
+                {(() => { const sc = getSeverityConfig(results.status); return (
+                  <div>
+                    <div className="flex justify-between text-[10px] font-mono text-slate-500 mb-1.5">
+                      <span>Anomaly Severity Level</span>
+                      <span className={sc.text}>{results.status}</span>
+                    </div>
+                    <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden">
+                      <div className={`h-full ${sc.bar} rounded-full transition-all duration-700`} style={{ width: sc.barWidth }} />
+                    </div>
+                  </div>
+                ); })()}
+
+                {/* Interpretation Layer */}
+                <div>
+                  <span className="text-[10px] font-mono text-slate-500 uppercase font-bold tracking-wider block mb-2">Interpretation Layer</span>
+                  <div className="p-4 rounded-lg bg-dark-deep/60 border border-white/5">
+                    <p className="text-slate-300 text-xs leading-relaxed">{results.explanation}</p>
+                  </div>
+                </div>
+
+                {/* Metrics */}
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="border border-white/5 bg-dark-deep/40 p-4 rounded-lg">
+                    <span className="text-[9px] font-mono text-slate-500 uppercase font-semibold block mb-1">Avg. Patch Similarity</span>
+                    <span className="text-lg font-bold text-white font-mono">{results.metrics.mean_similarity.toFixed(4)}</span>
+                  </div>
+                  <div className="border border-white/5 bg-dark-deep/40 p-4 rounded-lg">
+                    <span className="text-[9px] font-mono text-slate-500 uppercase font-semibold block mb-1">Min Patch Similarity</span>
+                    <span className="text-lg font-bold text-white font-mono">{results.metrics.min_similarity.toFixed(4)}</span>
+                  </div>
+                  <div className="border border-white/5 bg-dark-deep/40 p-4 rounded-lg">
+                    <span className="text-[9px] font-mono text-slate-500 uppercase font-semibold block mb-1">Anomaly Area Ratio</span>
+                    <span className="text-lg font-bold text-white font-mono">{(results.metrics.anomaly_pixel_ratio * 100).toFixed(2)}%</span>
+                  </div>
+                </div>
+
+                {/* PDF Export */}
+                <button
+                  onClick={() => exportPDF(results, 'Dynamic Inspection')}
+                  className="flex items-center gap-2 px-4 py-2.5 border border-cyan-glow/20 bg-cyan-glow/5 text-cyan-glow hover:bg-cyan-glow/10 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer active:scale-95 self-start"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  Export Inspection Report (PDF)
+                </button>
               </div>
 
               {/* Right side: Localized Regions Coordinates */}

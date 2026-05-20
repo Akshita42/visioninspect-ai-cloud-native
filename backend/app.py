@@ -161,22 +161,7 @@ async def analyze_images(
         # 5. Add proper anomaly decision logic
         has_anomalies = (mean_sim < 0.985 or min_sim < 0.95) and (len(detected_regions) > 0)
 
-        if has_anomalies:
-            status = "POSSIBLE ANOMALY DETECTED"
-            explanation = (
-                f"The patch comparison detected visual inconsistencies compared to the reference image in "
-                f"{len(detected_regions)} localized region(s). The system flagged anomalous surface features "
-                f"with a maximum localized deviation score of {(1.0 - min_sim):.3f} and an average patch "
-                f"similarity index of {mean_sim:.3f}. These regions correspond to unusual surface patterns, "
-                f"deformations, or texture variations."
-            )
-        else:
-            status = "NOMINAL STRUCTURE PASSED"
-            explanation = (
-                f"No significant visual anomalies were detected. All patches conform to the reference image "
-                f"within acceptable statistical thresholds. The average patch similarity index is {mean_sim:.3f} "
-                f"(minimum local similarity: {min_sim:.3f}), indicating a highly similar surface configuration."
-            )
+        if not has_anomalies:
             # Ensure everything is clean and empty
             detected_regions = []
             anomaly_score = float(max(0.0, (1.0 - mean_sim) * 0.1))
@@ -184,6 +169,36 @@ async def analyze_images(
             overlay = test_np.copy()
             defect_detection = test_np.copy()
             anomaly_pixel_ratio = 0.0
+
+        # Calibrate severity status
+        if anomaly_score < 0.12:
+            status = "STRUCTURE VERIFIED"
+            explanation = (
+                f"No significant visual anomalies were detected. All patches conform to the reference image "
+                f"within acceptable statistical thresholds. The average patch similarity index is {mean_sim:.3f} "
+                f"(minimum local similarity: {min_sim:.3f}), indicating a highly similar surface configuration."
+            )
+        elif anomaly_score < 0.28:
+            status = "MINOR VISUAL VARIATION"
+            explanation = (
+                f"Minor visual variations were observed (average similarity: {mean_sim:.3f}, min local similarity: {min_sim:.3f}). "
+                f"These deviations are likely caused by negligible surface reflections, slight orientation changes, or ambient light fluctuations, "
+                f"passing standard structural validation constraints."
+            )
+        elif anomaly_score < 0.50:
+            status = "MODERATE ANOMALY"
+            explanation = (
+                f"Moderate anomalies detected. Local deviations were identified in {len(detected_regions)} region(s) "
+                f"with a localized cosine similarity drop to {min_sim:.3f}. The system suggests visible surface "
+                f"irregularities, small scratches, or contamination patterns."
+            )
+        else:
+            status = "SEVERE ANOMALY"
+            explanation = (
+                f"Severe anomalies detected. Distinct visual mismatches compared to the reference target were identified in "
+                f"{len(detected_regions)} region(s), with localized similarity dropping to {min_sim:.3f} and an anomaly score of {anomaly_score:.3f}. "
+                f"This indicates major structural cracks, surface ruptures, or significant contamination."
+            )
 
         # Convert images to base64 Data URLs
         ref_b64 = encode_img_to_base64(cv2.cvtColor(ref_np, cv2.COLOR_RGB2BGR))
@@ -213,6 +228,30 @@ async def analyze_images(
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Pipeline error: {str(e)}")
+
+@app.get("/evaluation")
+async def get_evaluation():
+    eval_path = os.path.join(os.path.dirname(__file__), "evaluation_results.json")
+    if os.path.exists(eval_path):
+        import json
+        with open(eval_path, "r") as f:
+            return json.load(f)
+    else:
+        return {
+            "metrics": {
+                "accuracy": 0.0,
+                "precision": 0.0,
+                "recall": 0.0,
+                "f1_score": 0.0,
+                "total_samples": 0,
+                "correct_predictions": 0,
+                "false_positives": 0,
+                "false_negatives": 0,
+                "true_positives": 0,
+                "true_negatives": 0
+            },
+            "samples": []
+        }
 
 # Serve static assets
 frontend_dist_path = os.path.abspath(
