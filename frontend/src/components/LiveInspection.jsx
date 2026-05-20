@@ -62,19 +62,22 @@ export default function LiveInspection() {
     };
   }, []);
 
+  // Bind stream to video element when available
+  useEffect(() => {
+    if (videoRef.current && stream) {
+      videoRef.current.srcObject = stream;
+    }
+  }, [stream]);
+
   const startWebcam = async () => {
     try {
       setError(null);
       const mediaStream = await navigator.mediaDevices.getUserMedia({
         video: { 
-          width: { ideal: 512 }, 
-          height: { ideal: 512 }, 
-          facingMode: "environment" 
+          width: { ideal: 640 }, 
+          height: { ideal: 480 } 
         }
       });
-      if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream;
-      }
       setStream(mediaStream);
       setCameraActive(true);
     } catch (err) {
@@ -266,15 +269,15 @@ export default function LiveInspection() {
         <div className="lg:col-span-7 space-y-4">
           <div className="relative aspect-square w-full max-w-md mx-auto rounded-xl overflow-hidden bg-dark-deep border border-white/5 flex flex-col items-center justify-center pulse-border-glow shadow-[0_0_30px_rgba(0,242,254,0.03)]">
             
-            {cameraActive ? (
-              <video 
-                ref={videoRef}
-                autoPlay 
-                playsInline
-                muted
-                className="w-full h-full object-cover"
-              />
-            ) : (
+            <video 
+              ref={videoRef}
+              autoPlay 
+              playsInline
+              muted
+              className={`w-full h-full object-cover ${cameraActive ? 'block' : 'hidden'}`}
+            />
+            
+            {!cameraActive && (
               <div className="text-center p-6 space-y-3">
                 <VideoOff className="w-12 h-12 text-slate-600 mx-auto" />
                 <p className="text-xs text-slate-500 font-mono">Webcam stream is currently offline.</p>
