@@ -3,8 +3,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Upload, Trash2, Play, RefreshCw, Layers, ShieldCheck, 
   HelpCircle, Info, ChevronRight, AlertTriangle, CheckCircle, 
-  FileText, Activity, BookOpen
+  FileText, Activity, BookOpen, Video
 } from 'lucide-react';
+import LiveInspection from './LiveInspection';
 
 export default function Playground() {
   const [activeTab, setActiveTab] = useState('upload'); // 'dashboard', 'upload', 'how-it-works', 'about'
@@ -158,6 +159,14 @@ export default function Playground() {
           >
             <Upload className="w-4 h-4" />
             Upload Inspection
+          </button>
+
+          <button
+            onClick={() => setActiveTab('live')}
+            className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-mono tracking-tight transition-all cursor-pointer ${activeTab === 'live' ? 'bg-cyan-glow/5 border border-cyan-glow/20 text-cyan-glow font-bold' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
+          >
+            <Video className="w-4 h-4" />
+            Live Inspection
           </button>
           
           <button
@@ -522,6 +531,11 @@ export default function Playground() {
             </AnimatePresence>
 
           </div>
+        )}
+
+        {/* TAB: LIVE INSPECTION */}
+        {activeTab === 'live' && (
+          <LiveInspection />
         )}
 
         {/* TAB 2: HOW IT WORKS WORKFLOW */}

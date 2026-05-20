@@ -1,0 +1,573 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { 
+  Camera, Video, AlertTriangle, CheckCircle, Info, 
+  RefreshCw, Trash2, VideoOff, ShieldCheck, Play, Layers
+} from 'lucide-react';
+
+export default function LiveInspection() {
+  const videoRef = useRef(null);
+  const [stream, setStream] = useState(null);
+  const [cameraActive, setCameraActive] = useState(false);
+  
+  // Captures
+  const [refBlob, setRefBlob] = useState(null);
+  const [refPreview, setRefPreview] = useState(null);
+  
+  // Process states
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [currentStep, setCurrentStep] = useState(0);
+  const [error, setError] = useState(null);
+  const [successMsg, setSuccessMsg] = useState(null);
+  
+  // Results
+  const [results, setResults] = useState(null);
+  const [showLaymanExplanation, setShowLaymanExplanation] = useState(false);
+
+  const steps = [
+    "Capturing current webcam frame...",
+    "Extracting image patches (64x64 grid)...",
+    "Generating CLIP embeddings via PyTorch...",
+    "Comparing patch visual similarities...",
+    "Generating anomaly heatmap matrices...",
+    "Localizing suspicious regions via OpenCV..."
+  ];
+
+  // Run progress timer during analysis
+  useEffect(() => {
+    let interval;
+    if (isAnalyzing) {
+      setCurrentStep(0);
+      interval = setInterval(() => {
+        setCurrentStep((prev) => {
+          if (prev < steps.length - 1) {
+            return prev + 1;
+          } else {
+            clearInterval(interval);
+            return prev;
+          }
+        });
+      }, 750); // Shift step every 750ms for snappy progress feedback
+    } else {
+      clearInterval(interval);
+    }
+    return () => clearInterval(interval);
+  }, [isAnalyzing]);
+
+  // Clean up camera stream on unmount
+  useEffect(() => {
+    startWebcam();
+    return () => {
+      stopWebcam();
+    };
+  }, []);
+
+  const startWebcam = async () => {
+    try {
+      setError(null);
+      const mediaStream = await navigator.mediaDevices.getUserMedia({
+        video: { 
+          width: { ideal: 512 }, 
+          height: { ideal: 512 }, 
+          facingMode: "environment" 
+        }
+      });
+      if (videoRef.current) {
+        videoRef.current.srcObject = mediaStream;
+      }
+      setStream(mediaStream);
+      setCameraActive(true);
+    } catch (err) {
+      console.error(err);
+      setError("Failed to access camera. Please verify device permissions and connection.");
+      setCameraActive(false);
+    }
+  };
+
+  const stopWebcam = () => {
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+      setStream(null);
+      setCameraActive(false);
+    }
+  };
+
+  const toggleCamera = () => {
+    if (cameraActive) {
+      stopWebcam();
+    } else {
+      startWebcam();
+    }
+  };
+
+  // Helper to grab frame as Blob
+  const captureFrameBlob = () => {
+    return new Promise((resolve, reject) => {
+      if (!videoRef.current || !cameraActive) {
+        reject("Webcam stream is not active or ready.");
+        return;
+      }
+      try {
+        const canvas = document.createElement("canvas");
+        // Square aspect ratio to match backend target (512x512)
+        canvas.width = 512;
+        canvas.height = 512;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          reject("Could not get 2D rendering context.");
+          return;
+        }
+
+        const video = videoRef.current;
+        const vWidth = video.videoWidth;
+        const vHeight = video.videoHeight;
+        
+        // Center crop to aspect-square
+        const size = Math.min(vWidth, vHeight);
+        const sx = (vWidth - size) / 2;
+        const sy = (vHeight - size) / 2;
+
+        ctx.drawImage(video, sx, sy, size, size, 0, 0, 512, 512);
+        
+        canvas.toBlob((blob) => {
+          if (blob) {
+            resolve(blob);
+          } else {
+            reject("Failed to serialize canvas to Blob.");
+          }
+        }, "image/png");
+      } catch (err) {
+        reject(err.message || "Failed during frame capture canvas serialization.");
+      }
+    });
+  };
+
+  const handleRegisterReference = async () => {
+    try {
+      setError(null);
+      setSuccessMsg(null);
+      
+      const blob = await captureFrameBlob();
+      setRefBlob(blob);
+      
+      // Revoke old object URL if any
+      if (refPreview) {
+        URL.revokeObjectURL(refPreview);
+      }
+      
+      setRefPreview(URL.createObjectURL(blob));
+      setSuccessMsg("Reference sample registered successfully");
+      setTimeout(() => setSuccessMsg(null), 3000);
+      setResults(null); // Clear previous results
+    } catch (err) {
+      setError(err.message || "Error capturing reference frame.");
+    }
+  };
+
+  const handleInspectFrame = async () => {
+    if (!refBlob) {
+      setError("Reference sample not registered. Please capture a reference sample first.");
+      return;
+    }
+    if (!cameraActive) {
+      setError("Webcam stream is inactive. Please activate camera to capture inspection frame.");
+      return;
+    }
+
+    setIsAnalyzing(true);
+    setError(null);
+    setResults(null);
+
+    try {
+      const testBlob = await captureFrameBlob();
+      const formData = new FormData();
+      formData.append("reference", refBlob, "reference.png");
+      formData.append("test", testBlob, "test.png");
+
+      const response = await fetch("/analyze", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Server returned status code: ${response.status}. Make sure backend is running.`);
+      }
+
+      const data = await response.json();
+      setResults(data);
+    } catch (err) {
+      console.error(err);
+      setError(err.message || "Failed to complete frame analysis. Verify backend server connectivity.");
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const handleReset = () => {
+    if (refPreview) {
+      URL.revokeObjectURL(refPreview);
+    }
+    setRefBlob(null);
+    setRefPreview(null);
+    setResults(null);
+    setError(null);
+    setSuccessMsg(null);
+    setIsAnalyzing(false);
+  };
+
+  return (
+    <div className="space-y-8 animate-fadeIn">
+      {/* Page Header */}
+      <div>
+        <h2 className="text-2xl md:text-3xl font-bold text-white tracking-tight">
+          Webcam Live Inspection Mode
+        </h2>
+        <p className="text-slate-400 text-sm mt-2 max-w-3xl">
+          Register a baseline reference target, place your test sample in front of the lens, and trigger dynamic anomaly detection via OpenAI CLIP.
+        </p>
+      </div>
+
+      {/* ALERTS */}
+      <AnimatePresence>
+        {error && (
+          <motion.div 
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="border border-red-500/20 bg-red-950/20 text-red-400 p-4 rounded-lg flex items-start gap-3 text-sm"
+          >
+            <AlertTriangle className="w-5 h-5 shrink-0 text-red-400" />
+            <div>
+              <strong className="font-bold">Inspection Error:</strong>
+              <p className="mt-1 text-slate-300 text-xs">{error}</p>
+            </div>
+          </motion.div>
+        )}
+
+        {successMsg && (
+          <motion.div 
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="border border-emerald-500/20 bg-emerald-950/20 text-emerald-400 p-4 rounded-lg flex items-start gap-3 text-sm font-mono"
+          >
+            <CheckCircle className="w-5 h-5 shrink-0 text-emerald-400" />
+            <div>
+              <p className="text-slate-200 text-xs font-bold">{successMsg}</p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* --- LIVE INTERACTION GRID --- */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        
+        {/* WEBCAM PREVIEW (LG: 7 COLS) */}
+        <div className="lg:col-span-7 space-y-4">
+          <div className="relative aspect-square w-full max-w-md mx-auto rounded-xl overflow-hidden bg-dark-deep border border-white/5 flex flex-col items-center justify-center pulse-border-glow shadow-[0_0_30px_rgba(0,242,254,0.03)]">
+            
+            {cameraActive ? (
+              <video 
+                ref={videoRef}
+                autoPlay 
+                playsInline
+                muted
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="text-center p-6 space-y-3">
+                <VideoOff className="w-12 h-12 text-slate-600 mx-auto" />
+                <p className="text-xs text-slate-500 font-mono">Webcam stream is currently offline.</p>
+              </div>
+            )}
+
+            {/* Glowing Watermark & Scan HUD overlay */}
+            {cameraActive && (
+              <>
+                <div className="absolute top-4 left-4 flex items-center gap-2 px-2.5 py-1 rounded bg-black/70 backdrop-blur border border-white/5 text-[9px] font-mono text-cyan-glow font-bold tracking-widest uppercase">
+                  <span className="w-1.5 h-1.5 rounded-full bg-cyan-glow animate-pulse"></span>
+                  Lens Active
+                </div>
+                
+                {/* Horizontal scanner bar active during load */}
+                {isAnalyzing && (
+                  <div className="laser-scan-bar"></div>
+                )}
+              </>
+            )}
+
+            {/* Hidden canvas element */}
+            <div className="hidden-stage absolute w-0 h-0 overflow-hidden">
+              <canvas id="hidden-webcam-canvas" width="512" height="512"></canvas>
+            </div>
+          </div>
+
+          {/* Web Camera Actions */}
+          <div className="flex justify-center gap-4 max-w-md mx-auto">
+            <button
+              onClick={toggleCamera}
+              className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-mono text-xs font-bold border transition-all cursor-pointer ${cameraActive ? 'bg-white/5 border-white/10 text-slate-400 hover:text-white' : 'bg-cyan-glow/10 border-cyan-glow/20 text-cyan-glow hover:bg-cyan-glow/20'}`}
+            >
+              {cameraActive ? <VideoOff className="w-4 h-4" /> : <Video className="w-4 h-4" />}
+              {cameraActive ? "Deactivate Cam" : "Activate Cam"}
+            </button>
+
+            <button
+              onClick={handleRegisterReference}
+              disabled={!cameraActive}
+              className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-cyan-glow border border-cyan-glow text-dark-deep font-mono text-xs font-bold hover:shadow-[0_0_15px_rgba(0,242,254,0.4)] disabled:opacity-40 disabled:pointer-events-none transition-all cursor-pointer"
+            >
+              <Camera className="w-4 h-4" />
+              Register Reference
+            </button>
+          </div>
+        </div>
+
+        {/* WORKSPACE & CAPTURED SNAPSHOTS (LG: 5 COLS) */}
+        <div className="lg:col-span-5 space-y-6">
+          
+          {/* Reference sample block */}
+          <div className="border border-white/5 bg-white/2 rounded-xl p-5 space-y-4">
+            <span className="text-xs font-mono font-bold text-slate-500 uppercase tracking-widest block">Registered Reference Target</span>
+            
+            {refPreview ? (
+              <div className="flex items-center gap-4 border border-cyan-glow/20 bg-cyan-glow/2 p-3 rounded-lg">
+                <div className="w-16 h-16 rounded overflow-hidden bg-dark-deep border border-white/5 aspect-square shrink-0">
+                  <img src={refPreview} alt="Reference Preview" className="w-full h-full object-cover" />
+                </div>
+                <div className="flex-1 space-y-2">
+                  <div className="text-[10px] font-mono text-cyan-glow font-bold uppercase tracking-wider">Ready to Inspect</div>
+                  <button
+                    onClick={handleReset}
+                    className="flex items-center gap-1 text-[10px] font-mono text-red-400 hover:text-red-300 cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    Reset Calibration
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="border border-dashed border-white/5 p-6 rounded-lg text-center text-slate-500 text-xs font-mono">
+                No baseline calibration reference target. Align normal object and click "Register Reference" above.
+              </div>
+            )}
+          </div>
+
+          {/* Trigger analysis button */}
+          <div className="space-y-3">
+            <button
+              onClick={handleInspectFrame}
+              disabled={!refBlob || !cameraActive || isAnalyzing}
+              className="w-full flex items-center justify-center gap-2.5 py-4 rounded-xl font-mono text-sm font-bold uppercase tracking-wide bg-gradient-to-r from-cyan-glow to-purple-glow text-white shadow-[0_0_20px_rgba(0,242,254,0.15)] hover:shadow-[0_0_30px_rgba(157,78,221,0.3)] disabled:opacity-40 disabled:pointer-events-none transition-all cursor-pointer active:scale-[0.99]"
+            >
+              <Play className="w-4 h-4 fill-current" />
+              Inspect Current Frame
+            </button>
+            <p className="text-[10px] text-slate-500 font-mono text-center">
+              *Inspection runs on demand. Continuous video streaming inference is disabled to prevent latency.
+            </p>
+          </div>
+
+          {/* --- ANALYSIS STEP LOADER --- */}
+          <AnimatePresence>
+            {isAnalyzing && (
+              <motion.div 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="border border-cyan-glow/10 bg-cyan-glow/2 p-5 rounded-xl space-y-5 shadow-[0_0_15px_rgba(0,242,254,0.02)]"
+              >
+                <div className="flex items-center gap-2 pb-3 border-b border-white/5">
+                  <RefreshCw className="w-4 h-4 text-cyan-glow animate-spin" />
+                  <span className="text-xs font-mono font-bold tracking-widest text-white uppercase">Inspection Pipeline Processing</span>
+                </div>
+                
+                <div className="space-y-3">
+                  {steps.map((step, idx) => (
+                    <div 
+                      key={idx} 
+                      className={`flex items-center gap-3 text-xs transition-colors font-mono ${currentStep > idx ? 'text-cyan-glow font-bold' : currentStep === idx ? 'text-white' : 'text-slate-600'}`}
+                    >
+                      <div className={`w-4.5 h-4.5 rounded-full flex items-center justify-center border text-[9px] ${currentStep > idx ? 'border-cyan-glow bg-cyan-glow/10 text-cyan-glow' : currentStep === idx ? 'border-white bg-white/5 text-white' : 'border-slate-800 text-slate-700'}`}>
+                        {currentStep > idx ? "✓" : idx + 1}
+                      </div>
+                      <span>{step}</span>
+                    </div>
+                  ))}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+        </div>
+
+      </div>
+
+      {/* --- RESULTS WORKSPACE --- */}
+      <AnimatePresence>
+        {results && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="space-y-8 animate-fadeIn pt-4"
+          >
+            {/* Results Title Section */}
+            <div className="border-t border-white/5 pt-8">
+              <h3 className="text-xl font-bold text-white tracking-tight mb-2">Visual Inspection Outputs</h3>
+              <p className="text-xs text-slate-500">FastAPI backend outputs generated dynamically from OpenAI CLIP similarity comparisons.</p>
+            </div>
+
+            {/* 5-Column Responsive Image Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+              
+              {/* 1. Reference */}
+              <div className="border border-white/5 bg-white/2 p-3 rounded-lg flex flex-col">
+                <span className="text-[10px] font-mono font-bold text-slate-500 uppercase tracking-widest mb-2 block">1. Reference</span>
+                <div className="relative aspect-square w-full rounded bg-dark-deep overflow-hidden border border-white/5 flex items-center justify-center">
+                  <img src={results.reference_image} alt="Reference" className="w-full h-full object-contain" />
+                </div>
+              </div>
+
+              {/* 2. Test */}
+              <div className="border border-white/5 bg-white/2 p-3 rounded-lg flex flex-col">
+                <span className="text-[10px] font-mono font-bold text-slate-500 uppercase tracking-widest mb-2 block">2. Test Image</span>
+                <div className="relative aspect-square w-full rounded bg-dark-deep overflow-hidden border border-white/5 flex items-center justify-center">
+                  <img src={results.test_image} alt="Test Subject" className="w-full h-full object-contain" />
+                </div>
+              </div>
+
+              {/* 3. Heatmap */}
+              <div className="border border-white/5 bg-white/2 p-3 rounded-lg flex flex-col">
+                <span className="text-[10px] font-mono font-bold text-cyan-glow uppercase tracking-widest mb-2 block">3. Heatmap</span>
+                <div className="relative aspect-square w-full rounded bg-dark-deep overflow-hidden border border-white/5 flex items-center justify-center">
+                  <img src={results.heatmap} alt="Anomaly Heatmap" className="w-full h-full object-contain" />
+                </div>
+              </div>
+
+              {/* 4. Overlay */}
+              <div className="border border-white/5 bg-white/2 p-3 rounded-lg flex flex-col">
+                <span className="text-[10px] font-mono font-bold text-purple-glow uppercase tracking-widest mb-2 block">4. Overlay Map</span>
+                <div className="relative aspect-square w-full rounded bg-dark-deep overflow-hidden border border-white/5 flex items-center justify-center">
+                  <img src={results.overlay} alt="Visual Blend" className="w-full h-full object-contain" />
+                </div>
+              </div>
+
+              {/* 5. Defect Detection */}
+              <div className="border border-cyan-glow/10 bg-cyan-glow/2 p-3 rounded-lg flex flex-col relative shadow-[0_0_15px_rgba(0,242,254,0.02)]">
+                <span className="text-[10px] font-mono font-bold text-cyan-glow uppercase tracking-widest mb-2 block">5. Defect Detection</span>
+                <div className="relative aspect-square w-full rounded bg-dark-deep overflow-hidden border border-cyan-glow/10 flex items-center justify-center">
+                  <img src={results.defect_detection} alt="Detection overlay" className="w-full h-full object-contain" />
+                </div>
+              </div>
+
+            </div>
+
+            {/* --- REPORT & EXPLANATION ROW --- */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
+              
+              {/* Left & Middle: System Report Panel */}
+              <div className="lg:col-span-2 border border-white/5 bg-white/2 rounded-xl p-6 flex flex-col justify-between">
+                <div className="space-y-6">
+                  
+                  <div className="flex items-center justify-between pb-4 border-b border-white/5">
+                    <span className="text-xs font-mono font-bold tracking-widest text-slate-500 uppercase">Inspection Report Summary</span>
+                    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded text-xs font-mono font-bold uppercase ${results.status === 'POSSIBLE ANOMALY DETECTED' ? 'bg-red-500/10 text-red-400 border border-red-500/20' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'}`}>
+                      {results.status === 'POSSIBLE ANOMALY DETECTED' ? <AlertTriangle className="w-3.5 h-3.5" /> : <CheckCircle className="w-3.5 h-3.5" />}
+                      {results.status}
+                    </span>
+                  </div>
+
+                  {/* Explain Result Accordion Button */}
+                  <div className="flex justify-between items-center bg-dark-deep/40 p-3 rounded-lg border border-white/5 text-xs">
+                    <span className="text-slate-400 font-mono">Translate metrics into readable text:</span>
+                    <button
+                      onClick={() => setShowLaymanExplanation(!showLaymanExplanation)}
+                      className="px-3.5 py-1.5 bg-white/5 hover:bg-white/10 text-white rounded font-mono border border-white/5 cursor-pointer active:scale-95 transition-all"
+                    >
+                      {showLaymanExplanation ? "Hide Summary" : "Interpret Metrics"}
+                    </button>
+                  </div>
+
+                  {/* EXPLANATION AREA */}
+                  <div className="p-4 rounded-lg bg-dark-deep/60 border border-white/5">
+                    <span className="text-[10px] font-mono text-slate-500 uppercase font-bold tracking-wider block mb-2">
+                      {showLaymanExplanation ? "Rule-Based Summary" : "Interpretation Layer Analysis"}
+                    </span>
+                    <p className="text-slate-300 text-sm leading-relaxed">
+                      {showLaymanExplanation 
+                        ? "The patch comparison module evaluated local variations against your baseline reference. Regions containing significant similarity deviations (e.g., structural variations, scratches, or deformations) have been identified and highlighted." 
+                        : results.explanation
+                      }
+                    </p>
+                  </div>
+
+                  {/* Technical similarity indices */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="border border-white/5 bg-dark-deep/40 p-4 rounded-lg">
+                      <span className="text-[9px] font-mono text-slate-500 uppercase font-semibold block mb-1">Average Patch Similarity</span>
+                      <span className="text-xl font-bold text-white font-mono">{results.metrics.mean_similarity.toFixed(4)}</span>
+                    </div>
+                    <div className="border border-white/5 bg-dark-deep/40 p-4 rounded-lg">
+                      <span className="text-[9px] font-mono text-slate-500 uppercase font-semibold block mb-1">Min Patch Similarity</span>
+                      <span className="text-xl font-bold text-white font-mono">{results.metrics.min_similarity.toFixed(4)}</span>
+                    </div>
+                    <div className="border border-white/5 bg-dark-deep/40 p-4 rounded-lg">
+                      <span className="text-[9px] font-mono text-slate-500 uppercase font-semibold block mb-1">Anomaly Area Ratio</span>
+                      <span className="text-xl font-bold text-white font-mono">{(results.metrics.anomaly_pixel_ratio * 100).toFixed(2)}%</span>
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+
+              {/* Right side: Localized Regions Coordinates */}
+              <div className="border border-white/5 bg-white/2 rounded-xl p-6 flex flex-col justify-between">
+                <div className="space-y-4">
+                  <div className="pb-3 border-b border-white/5">
+                    <span className="text-xs font-mono font-bold tracking-widest text-slate-500 uppercase">Localized Coordinates</span>
+                  </div>
+                  
+                  <div className="space-y-2.5 max-h-[220px] overflow-y-auto pr-1">
+                    {results.detected_regions.length === 0 ? (
+                      <p className="text-xs text-slate-500 font-mono italic">No bounding contours detected.</p>
+                    ) : (
+                      results.detected_regions.map((reg) => (
+                        <div key={reg.id} className="border border-white/5 bg-dark-deep/40 p-3 rounded text-[11px] font-mono text-slate-400 leading-normal flex items-center justify-between">
+                          <div>
+                            <div className="text-white font-bold mb-1">Region #{reg.id + 1}</div>
+                            <div>X: {reg.x.toFixed(1)}% | Y: {reg.y.toFixed(1)}%</div>
+                            <div>W: {reg.width.toFixed(1)}% | H: {reg.height.toFixed(1)}%</div>
+                          </div>
+                          <span className="text-[10px] text-cyan-glow font-bold border border-cyan-glow/20 bg-cyan-glow/5 px-2 py-0.5 rounded">
+                            {reg.area_px} px²
+                          </span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                <div className="pt-4 border-t border-white/5 space-y-2">
+                  <div className="flex justify-between text-xs font-mono text-slate-400">
+                    <span>Anomaly Score:</span>
+                    <span className="text-white font-bold">{results.anomaly_score.toFixed(3)}</span>
+                  </div>
+                  <div className="flex justify-between text-xs font-mono text-slate-400">
+                    <span>Anomaly Confidence Estimate:</span>
+                    <span className="text-cyan-glow font-bold">{(Math.max(0, (1 - results.metrics.min_similarity) * 100)).toFixed(1)}%</span>
+                  </div>
+                  <div className="text-[9px] font-mono text-slate-500 leading-normal border-t border-white/5 pt-1.5">
+                    *Derived directly from maximum localized patch similarity distance: (1 - Min Patch Similarity) × 100.
+                  </div>
+                </div>
+
+              </div>
+
+            </div>
+
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
