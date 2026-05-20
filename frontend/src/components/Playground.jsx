@@ -165,8 +165,11 @@ export default function Playground() {
             onClick={() => setActiveTab('live')}
             className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-mono tracking-tight transition-all cursor-pointer ${activeTab === 'live' ? 'bg-cyan-glow/5 border border-cyan-glow/20 text-cyan-glow font-bold' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
           >
-            <Video className="w-4 h-4" />
-            Live Inspection
+            <Video className="w-4 h-4 shrink-0" />
+            <div className="text-left leading-tight">
+              <div>Dynamic Inspection</div>
+              <div className="text-[9px] opacity-70 font-normal block">Webcam Frame Comparison</div>
+            </div>
           </button>
           
           <button

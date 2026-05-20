@@ -9,10 +9,13 @@ export default function LiveInspection() {
   const videoRef = useRef(null);
   const [stream, setStream] = useState(null);
   const [cameraActive, setCameraActive] = useState(false);
+  const [cameraPermissionDenied, setCameraPermissionDenied] = useState(false);
   
   // Captures
   const [refBlob, setRefBlob] = useState(null);
   const [refPreview, setRefPreview] = useState(null);
+  const [refTimestamp, setRefTimestamp] = useState(null);
+  const [inspectTimestamp, setInspectTimestamp] = useState(null);
   
   // Process states
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -72,6 +75,7 @@ export default function LiveInspection() {
   const startWebcam = async () => {
     try {
       setError(null);
+      setCameraPermissionDenied(false);
       const mediaStream = await navigator.mediaDevices.getUserMedia({
         video: { 
           width: { ideal: 640 }, 
@@ -84,6 +88,7 @@ export default function LiveInspection() {
       console.error(err);
       setError("Failed to access camera. Please verify device permissions and connection.");
       setCameraActive(false);
+      setCameraPermissionDenied(true);
     }
   };
 
@@ -159,6 +164,7 @@ export default function LiveInspection() {
       }
       
       setRefPreview(URL.createObjectURL(blob));
+      setRefTimestamp(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
       setSuccessMsg("Reference sample registered successfully");
       setTimeout(() => setSuccessMsg(null), 3000);
       setResults(null); // Clear previous results
@@ -183,6 +189,11 @@ export default function LiveInspection() {
 
     try {
       const testBlob = await captureFrameBlob();
+      
+      // Capture local timestamp immediately upon canvas crop
+      const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      setInspectTimestamp(timestamp);
+
       const formData = new FormData();
       formData.append("reference", refBlob, "reference.png");
       formData.append("test", testBlob, "test.png");
@@ -212,6 +223,8 @@ export default function LiveInspection() {
     }
     setRefBlob(null);
     setRefPreview(null);
+    setRefTimestamp(null);
+    setInspectTimestamp(null);
     setResults(null);
     setError(null);
     setSuccessMsg(null);
@@ -223,10 +236,10 @@ export default function LiveInspection() {
       {/* Page Header */}
       <div>
         <h2 className="text-2xl md:text-3xl font-bold text-white tracking-tight">
-          Webcam Live Inspection Mode
+          Webcam-Based Dynamic Inspection
         </h2>
         <p className="text-slate-400 text-sm mt-2 max-w-3xl">
-          Register a baseline reference target, place your test sample in front of the lens, and trigger dynamic anomaly detection via OpenAI CLIP.
+          Register a baseline reference target, place your test sample in front of the lens, and trigger on-demand live analysis via OpenAI CLIP.
         </p>
       </div>
 
@@ -284,19 +297,34 @@ export default function LiveInspection() {
               </div>
             )}
 
-            {/* Glowing Watermark & Scan HUD overlay */}
-            {cameraActive && (
-              <>
-                <div className="absolute top-4 left-4 flex items-center gap-2 px-2.5 py-1 rounded bg-black/70 backdrop-blur border border-white/5 text-[9px] font-mono text-cyan-glow font-bold tracking-widest uppercase">
-                  <span className="w-1.5 h-1.5 rounded-full bg-cyan-glow animate-pulse"></span>
-                  Lens Active
-                </div>
-                
-                {/* Horizontal scanner bar active during load */}
-                {isAnalyzing && (
-                  <div className="laser-scan-bar"></div>
-                )}
-              </>
+            {/* Monospace Camera Status Indicator */}
+            {cameraPermissionDenied ? (
+              <div className="absolute top-4 left-4 flex items-center gap-2 px-2.5 py-1 rounded bg-black/70 backdrop-blur border border-red-500/20 text-[9px] font-mono text-red-400 font-bold uppercase tracking-wider z-20">
+                <span className="relative flex h-1.5 w-1.5">
+                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-red-500 animate-pulse"></span>
+                </span>
+                Camera Access Denied
+              </div>
+            ) : cameraActive ? (
+              <div className="absolute top-4 left-4 flex items-center gap-2 px-2.5 py-1 rounded bg-black/70 backdrop-blur border-emerald-500/20 text-[9px] font-mono text-emerald-400 font-bold uppercase tracking-wider z-20">
+                <span className="relative flex h-1.5 w-1.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+                </span>
+                Camera Active
+              </div>
+            ) : (
+              <div className="absolute top-4 left-4 flex items-center gap-2 px-2.5 py-1 rounded bg-black/70 backdrop-blur border-white/5 text-[9px] font-mono text-slate-400 font-bold uppercase tracking-wider z-20">
+                <span className="relative flex h-1.5 w-1.5">
+                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-slate-500"></span>
+                </span>
+                Camera Offline
+              </div>
+            )}
+
+            {/* Horizontal scanner bar active during load */}
+            {isAnalyzing && (
+              <div className="laser-scan-bar"></div>
             )}
 
             {/* Hidden canvas element */}
@@ -334,15 +362,21 @@ export default function LiveInspection() {
             <span className="text-xs font-mono font-bold text-slate-500 uppercase tracking-widest block">Registered Reference Target</span>
             
             {refPreview ? (
-              <div className="flex items-center gap-4 border border-cyan-glow/20 bg-cyan-glow/2 p-3 rounded-lg">
+              <div className="flex items-center gap-4 border border-cyan-glow/20 bg-cyan-glow/2 p-3 rounded-lg animate-fadeIn">
                 <div className="w-16 h-16 rounded overflow-hidden bg-dark-deep border border-white/5 aspect-square shrink-0">
                   <img src={refPreview} alt="Reference Preview" className="w-full h-full object-cover" />
                 </div>
-                <div className="flex-1 space-y-2">
+                <div className="flex-1 space-y-1">
                   <div className="text-[10px] font-mono text-cyan-glow font-bold uppercase tracking-wider">Ready to Inspect</div>
+                  {refTimestamp && (
+                    <div className="text-[9px] font-mono text-slate-500">
+                      Reference Captured:<br />
+                      <span className="text-slate-300 font-semibold">{refTimestamp}</span>
+                    </div>
+                  )}
                   <button
                     onClick={handleReset}
-                    className="flex items-center gap-1 text-[10px] font-mono text-red-400 hover:text-red-300 cursor-pointer"
+                    className="flex items-center gap-1 text-[10px] font-mono text-red-400 hover:text-red-300 cursor-pointer pt-1"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                     Reset Calibration
@@ -424,19 +458,33 @@ export default function LiveInspection() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
               
               {/* 1. Reference */}
-              <div className="border border-white/5 bg-white/2 p-3 rounded-lg flex flex-col">
-                <span className="text-[10px] font-mono font-bold text-slate-500 uppercase tracking-widest mb-2 block">1. Reference</span>
-                <div className="relative aspect-square w-full rounded bg-dark-deep overflow-hidden border border-white/5 flex items-center justify-center">
-                  <img src={results.reference_image} alt="Reference" className="w-full h-full object-contain" />
+              <div className="border border-white/5 bg-white/2 p-3 rounded-lg flex flex-col justify-between">
+                <div>
+                  <span className="text-[10px] font-mono font-bold text-slate-500 uppercase tracking-widest mb-2 block">1. Reference</span>
+                  <div className="relative aspect-square w-full rounded bg-dark-deep overflow-hidden border border-white/5 flex items-center justify-center">
+                    <img src={results.reference_image} alt="Reference" className="w-full h-full object-contain" />
+                  </div>
                 </div>
+                {refTimestamp && (
+                  <div className="text-[9px] font-mono text-slate-500 mt-2 text-center">
+                    Reference Captured: <span className="text-slate-300 font-semibold">{refTimestamp}</span>
+                  </div>
+                )}
               </div>
 
               {/* 2. Test */}
-              <div className="border border-white/5 bg-white/2 p-3 rounded-lg flex flex-col">
-                <span className="text-[10px] font-mono font-bold text-slate-500 uppercase tracking-widest mb-2 block">2. Test Image</span>
-                <div className="relative aspect-square w-full rounded bg-dark-deep overflow-hidden border border-white/5 flex items-center justify-center">
-                  <img src={results.test_image} alt="Test Subject" className="w-full h-full object-contain" />
+              <div className="border border-white/5 bg-white/2 p-3 rounded-lg flex flex-col justify-between">
+                <div>
+                  <span className="text-[10px] font-mono font-bold text-slate-500 uppercase tracking-widest mb-2 block">2. Test Image</span>
+                  <div className="relative aspect-square w-full rounded bg-dark-deep overflow-hidden border border-white/5 flex items-center justify-center">
+                    <img src={results.test_image} alt="Test Subject" className="w-full h-full object-contain" />
+                  </div>
                 </div>
+                {inspectTimestamp && (
+                  <div className="text-[9px] font-mono text-slate-500 mt-2 text-center">
+                    Inspection Captured: <span className="text-slate-300 font-semibold">{inspectTimestamp}</span>
+                  </div>
+                )}
               </div>
 
               {/* 3. Heatmap */}
