@@ -1,0 +1,13 @@
+VisionInspect AI Evaluation Summary
+
+Total Images: 83
+Correct Predictions: 63
+Accuracy: 75.9%
+Precision: 75.9%
+Recall: 100.0%
+F1 Score: 86.3%
+
+False Positives: 20
+False Negatives: 0
+True Positives: 63
+True Negatives: 0
