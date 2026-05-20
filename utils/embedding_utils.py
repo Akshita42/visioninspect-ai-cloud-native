@@ -12,7 +12,8 @@ def get_patch_embeddings(
     patches,
     model,
     processor,
-    batch_size=64
+    batch_size=64,
+    device="cpu"
 ):
 
     all_features = []
