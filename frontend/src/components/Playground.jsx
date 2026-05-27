@@ -8,6 +8,7 @@ import {
   BarChart2, History, X, AlertCircle, Zap
 } from 'lucide-react';
 import LiveInspection from './LiveInspection';
+import { API_BASE_URL } from "../config";
 
 // ─── Severity helpers ──────────────────────────────────────────────────────────
 function getSeverityConfig(status) {
@@ -255,7 +256,7 @@ export default function Playground() {
     setEvalLoading(true);
     setEvalError(null);
     try {
-      const res = await fetch('/evaluation');
+      const res = await fetch(`${API_BASE_URL}/evaluation`);
       if (!res.ok) throw new Error('Could not load evaluation data.');
       const data = await res.json();
       setEvalData(data);

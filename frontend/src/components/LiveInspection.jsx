@@ -249,7 +249,7 @@ export default function LiveInspection({ onHistoryUpdate }) {
       formData.append("reference", refBlob, "reference.png");
       formData.append("test", testBlob, "test.png");
 
-      const response = await fetch("/analyze", {
+      const response = await fetch("http://localhost:8000/analyze", {
         method: "POST",
         body: formData,
       });

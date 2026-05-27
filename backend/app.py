@@ -5,12 +5,21 @@ import sys
 import numpy as np
 import cv2
 import torch
+import logging
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from PIL import Image
 from transformers import CLIPProcessor, CLIPModel
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s"
+)
+
+logger = logging.getLogger(__name__)
+
 
 # Add parent directory to sys.path so we can import utils and config
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -45,13 +54,13 @@ processor = None
 @app.on_event("startup")
 def load_clip_model():
     global model, processor
-    print(f"Loading CLIP model on device: {device}...")
+    logger.info(f"Loading CLIP model on device: {device}...")
     try:
         model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32").to(device)
         processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
-        print("CLIP model and processor loaded successfully.")
+        logger.info("CLIP model and processor loaded successfully.")
     except Exception as e:
-        print(f"Error loading CLIP model: {e}")
+        logger.error(f"Error loading CLIP model: {e}")
         raise e
 
 def encode_img_to_base64(img_np):
@@ -298,4 +307,4 @@ async def serve_frontend(catchall: str):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("app:app", host="127.0.0.1", port=8000, reload=False)
+    uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=False)
