@@ -23,6 +23,6 @@ RUN pip install --no-cache-dir \
 
 COPY . .
 
-EXPOSE 8000
+EXPOSE 7860
 
 CMD ["python", "app.py"]
