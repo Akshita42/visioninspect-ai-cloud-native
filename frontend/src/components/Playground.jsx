@@ -361,7 +361,7 @@ export default function Playground() {
 
         <div className="border-t border-white/5 pt-4 text-[10px] font-mono text-slate-600">
           <div>Status: API Ready</div>
-          <div className="mt-1">Host: 127.0.0.1:8000</div>
+          <div className="mt-1 text-[8px] opacity-70">Host: {API_BASE_URL}</div>
         </div>
       </aside>
 
