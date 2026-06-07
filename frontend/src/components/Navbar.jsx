@@ -49,6 +49,13 @@ export default function Navbar({ currentPage, onChangePage, onScrollToSection })
             Home
           </a>
           <a 
+            href="#architecture" 
+            onClick={(e) => handleLinkClick(e, 'architecture')}
+            className="hover:text-white transition-colors"
+          >
+            Architecture
+          </a>
+          <a 
             href="#how-it-works" 
             onClick={(e) => handleLinkClick(e, 'how-it-works')}
             className="hover:text-white transition-colors"

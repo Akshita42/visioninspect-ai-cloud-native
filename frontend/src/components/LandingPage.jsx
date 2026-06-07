@@ -3,7 +3,8 @@ import { motion } from 'framer-motion';
 import { 
   ArrowRight, Upload, Layers, Cpu, GitCompare, 
   Map, Target, ShieldCheck, Eye, HelpCircle, 
-  FileText, Flame, Activity, Hourglass, Globe
+  FileText, Flame, Activity, Hourglass, Globe,
+  Server, Cloud, Box, Workflow, Monitor
 } from 'lucide-react';
 
 export default function LandingPage({ onLaunchPlayground }) {
@@ -96,6 +97,31 @@ export default function LandingPage({ onLaunchPlayground }) {
       icon: <Eye className="w-6 h-6 text-purple-glow" />,
       title: "Visual Inspection Workflow",
       desc: "Provides side-by-side inspection stages (Reference vs Test vs Heatmap vs Overlay) for comparative verification."
+    },
+    {
+      icon: <Box className="w-6 h-6 text-cyan-glow" />,
+      title: "Docker Containerization",
+      desc: "Microservices packaged in isolated Docker containers for consistent deployment across any environment."
+    },
+    {
+      icon: <Workflow className="w-6 h-6 text-purple-glow" />,
+      title: "Jenkins CI/CD",
+      desc: "Automated build, test, and deployment pipelines ensuring reliable and continuous delivery updates."
+    },
+    {
+      icon: <Server className="w-6 h-6 text-cyan-glow" />,
+      title: "Kubernetes Orchestration",
+      desc: "Automated scaling, load balancing, and self-healing of production workloads via K8s clusters."
+    },
+    {
+      icon: <Cloud className="w-6 h-6 text-purple-glow" />,
+      title: "Terraform IaC & AWS",
+      desc: "Infrastructure as Code provisioning robust AWS cloud environments for scalable platform hosting."
+    },
+    {
+      icon: <Monitor className="w-6 h-6 text-cyan-glow" />,
+      title: "Prometheus & Grafana",
+      desc: "Real-time system telemetry, metric monitoring, and performance dashboards for cluster health."
     }
   ];
 
@@ -172,7 +198,7 @@ export default function LandingPage({ onLaunchPlayground }) {
           className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-cyan-glow/20 bg-cyan-glow/5 text-xs font-mono font-bold uppercase tracking-wider text-cyan-glow mb-8"
         >
           <span className="w-1.5 h-1.5 rounded-full bg-cyan-glow animate-pulse"></span>
-          CLIP-Based Anomaly Detection System
+          Cloud-Native AI Platform
         </motion.div>
 
         {/* Main Headline */}
@@ -182,7 +208,7 @@ export default function LandingPage({ onLaunchPlayground }) {
           transition={{ duration: 0.8, delay: 0.1 }}
           className="text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight text-white max-w-5xl leading-[1.1] mb-6"
         >
-          AI-Powered Industrial <br />
+          Enterprise-Grade Visual <br />
           <span className="bg-gradient-to-r from-cyan-glow via-teal-300 to-purple-glow bg-clip-text text-transparent">
             Anomaly Detection
           </span>
@@ -195,7 +221,7 @@ export default function LandingPage({ onLaunchPlayground }) {
           transition={{ duration: 0.8, delay: 0.2 }}
           className="text-lg md:text-xl text-slate-400 max-w-3xl leading-relaxed mb-12"
         >
-          A CLIP-based computer vision system for identifying visual anomalies and defects using reference image comparison.
+          A scalable, orchestrated computer vision system for identifying visual anomalies and defects using AI and modern DevOps practices.
         </motion.p>
 
         {/* CTA Actions */}
@@ -265,8 +291,11 @@ export default function LandingPage({ onLaunchPlayground }) {
             <p className="text-slate-400 text-base leading-relaxed mb-6">
               Traditional industrial defect inspection systems depend heavily on large datasets consisting of thousands of sample images labeled with specific, known defects. 
             </p>
-            <p className="text-slate-400 text-base leading-relaxed mb-8">
+            <p className="text-slate-400 text-base leading-relaxed mb-6">
               <strong>VisionInspect AI</strong> bypasses this limitation. Our system operates on a zero-shot, reference-based pipeline. It computes semantic similarity differences between a single defect-free reference image and an inspected test subject using HuggingFace CLIP encoders.
+            </p>
+            <p className="text-slate-400 text-base leading-relaxed mb-8">
+              Evolving beyond a standalone ML script, the platform is now a fully orchestrated, <strong>Cloud-Native architecture</strong>. Containerized with Docker, deployed via Terraform onto AWS, managed by Kubernetes, and continuously monitored through Prometheus and Grafana, it represents a production-ready enterprise solution.
             </p>
 
             <div className="flex flex-col sm:flex-row gap-6">
@@ -305,6 +334,91 @@ export default function LandingPage({ onLaunchPlayground }) {
           </div>
 
         </div>
+      </section>
+
+      {/* --- SYSTEM ARCHITECTURE SECTION --- */}
+      <section id="architecture" className="relative max-w-7xl mx-auto px-6 py-24 border-t border-white/5 z-10">
+        <div className="text-center max-w-3xl mx-auto mb-16">
+          <span className="text-xs font-mono text-cyan-glow uppercase tracking-widest font-bold mb-3 block">Infrastructure</span>
+          <h2 className="text-3xl md:text-4xl font-bold text-white">Cloud-Native Architecture</h2>
+          <p className="text-slate-400 mt-4">
+            A resilient, scalable microservices infrastructure deployed using industry-standard DevOps practices.
+          </p>
+        </div>
+
+        <div className="flex flex-col md:flex-row items-center justify-center gap-4 relative">
+          
+          <motion.div 
+            initial={{ opacity: 0, x: -20 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+            className="border border-white/5 bg-white/2 p-6 rounded-xl flex flex-col items-center w-full max-w-[200px] z-10"
+          >
+            <Box className="w-8 h-8 text-cyan-glow mb-4" />
+            <span className="text-sm font-bold text-white mb-1">React Client</span>
+            <span className="text-[10px] text-slate-500 font-mono text-center">Nginx &bull; Vercel</span>
+          </motion.div>
+
+          <div className="hidden md:block w-8 h-[1px] bg-white/10 relative">
+            <div className="absolute right-0 top-1/2 -translate-y-1/2 w-2 h-2 border-t border-r border-white/20 rotate-45"></div>
+          </div>
+          <div className="md:hidden h-8 w-[1px] bg-white/10 relative"></div>
+
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: 0.1 }}
+            className="border border-purple-glow/20 bg-purple-glow/5 p-6 rounded-xl flex flex-col items-center w-full max-w-[200px] z-10 shadow-[0_0_15px_rgba(168,85,247,0.05)]"
+          >
+            <Server className="w-8 h-8 text-purple-glow mb-4" />
+            <span className="text-sm font-bold text-white mb-1">FastAPI Backend</span>
+            <span className="text-[10px] text-slate-500 font-mono text-center">Docker &bull; Render</span>
+          </motion.div>
+
+          <div className="hidden md:block w-8 h-[1px] bg-white/10 relative">
+            <div className="absolute right-0 top-1/2 -translate-y-1/2 w-2 h-2 border-t border-r border-white/20 rotate-45"></div>
+          </div>
+          <div className="md:hidden h-8 w-[1px] bg-white/10 relative"></div>
+
+          <motion.div 
+            initial={{ opacity: 0, x: 20 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: 0.2 }}
+            className="border border-white/5 bg-white/2 p-6 rounded-xl flex flex-col items-center w-full max-w-[200px] z-10"
+          >
+            <Cloud className="w-8 h-8 text-cyan-glow mb-4" />
+            <span className="text-sm font-bold text-white mb-1">AWS Cloud</span>
+            <span className="text-[10px] text-slate-500 font-mono text-center">EC2 &bull; Terraform</span>
+          </motion.div>
+
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mt-12 max-w-4xl mx-auto">
+          <div className="border border-white/5 bg-slate-950/40 p-5 rounded-lg flex items-center gap-4">
+            <Workflow className="w-5 h-5 text-slate-400" />
+            <div>
+              <div className="text-xs font-bold text-white mb-0.5">Jenkins CI/CD</div>
+              <div className="text-[10px] text-slate-500">Automated Pipeline</div>
+            </div>
+          </div>
+          <div className="border border-white/5 bg-slate-950/40 p-5 rounded-lg flex items-center gap-4">
+            <div className="w-5 h-5 flex items-center justify-center font-bold text-slate-400 font-mono text-xs border border-slate-500/30 rounded-sm">K8s</div>
+            <div>
+              <div className="text-xs font-bold text-white mb-0.5">Kubernetes</div>
+              <div className="text-[10px] text-slate-500">Cluster Orchestration</div>
+            </div>
+          </div>
+          <div className="border border-white/5 bg-slate-950/40 p-5 rounded-lg flex items-center gap-4">
+            <Monitor className="w-5 h-5 text-slate-400" />
+            <div>
+              <div className="text-xs font-bold text-white mb-0.5">Grafana</div>
+              <div className="text-[10px] text-slate-500">Prometheus Telemetry</div>
+            </div>
+          </div>
+        </div>
+
       </section>
 
       {/* --- HOW IT WORKS (FLOWCHART SECTION) --- */}
@@ -439,7 +553,7 @@ export default function LandingPage({ onLaunchPlayground }) {
               </a>
             </div>
             <div className="text-[10px] text-slate-600 font-mono">
-              Tech Stack: PyTorch • OpenCV • HuggingFace CLIP • FastAPI • React
+              Tech Stack: PyTorch • CLIP • FastAPI • React • Docker • Kubernetes • AWS • Terraform
             </div>
           </div>
 
