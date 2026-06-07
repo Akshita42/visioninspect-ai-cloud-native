@@ -56,7 +56,7 @@ def load_clip_model():
     global model, processor
     logger.info(f"Loading CLIP model on device: {device}...")
     try:
-        model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32").to(device)
+        model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32", torch_dtype=torch.float16, low_cpu_mem_usage=True).to(device)
         processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
         logger.info("CLIP model and processor loaded successfully.")
     except Exception as e:
