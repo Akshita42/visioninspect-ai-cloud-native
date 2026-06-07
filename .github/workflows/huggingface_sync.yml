@@ -15,4 +15,4 @@ jobs:
       - name: Push to hub
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-        run: git push --force https://Akshita42:$HF_TOKEN@huggingface.co/spaces/Akshita42/visioninspect-backend main
+        run: git push --force https://Akshita42:$HF_TOKEN@huggingface.co/spaces/Akshita42/visioninspect-backend HEAD:main
