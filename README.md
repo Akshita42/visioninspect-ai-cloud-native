@@ -1,3 +1,12 @@
+---
+title: Visioninspect Backend
+emoji: 👁️
+colorFrom: blue
+colorTo: purple
+sdk: docker
+pinned: false
+---
+
 # VisionInspect.AI
 
 > Cloud-Native Industrial Anomaly Detection Platform using CLIP, FastAPI, Docker, Kubernetes, Jenkins, Terraform, and AWS
