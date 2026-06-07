@@ -5,6 +5,7 @@ import {
   Camera, Video, AlertTriangle, CheckCircle, Info, AlertCircle,
   RefreshCw, Trash2, VideoOff, ShieldCheck, Play, Layers, Download, Clock
 } from 'lucide-react';
+import { API_BASE_URL } from '../config';
 
 // Severity helpers (mirrors Playground.jsx)
 function getSeverityConfig(status) {
@@ -249,7 +250,7 @@ export default function LiveInspection({ onHistoryUpdate }) {
       formData.append("reference", refBlob, "reference.png");
       formData.append("test", testBlob, "test.png");
 
-      const response = await fetch("http://localhost:8000/analyze", {
+      const response = await fetch(`${API_BASE_URL}/analyze`, {
         method: "POST",
         body: formData,
       });

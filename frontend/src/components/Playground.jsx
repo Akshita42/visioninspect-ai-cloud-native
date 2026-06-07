@@ -302,7 +302,7 @@ export default function Playground() {
     formData.append('reference', refFile);
     formData.append('test', testFile);
     try {
-      const response = await fetch('/analyze', { method: 'POST', body: formData });
+      const response = await fetch(`${API_BASE_URL}/analyze`, { method: 'POST', body: formData });
       if (!response.ok) throw new Error(`Server returned status code: ${response.status}.`);
       const data = await response.json();
       setResults(data);
