@@ -14,3 +14,4 @@ safetensors==0.7.0
 tqdm==4.67.3
 requests==2.33.1
 PyYAML==6.0.3
+accelerate==0.31.0
