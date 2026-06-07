@@ -17,4 +17,4 @@ jobs:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
           pip install huggingface_hub
-          huggingface-cli upload Akshita42/visioninspect-backend . . --repo-type space --commit-message "Sync from GitHub"
+          hf upload Akshita42/visioninspect-backend . . --repo-type space --commit-message "Sync from GitHub"
